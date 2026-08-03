@@ -1,24 +1,35 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, Integer, String, Boolean
+import sqlite3
+import json
 
-engine = create_async_engine("sqlite+aiosqlite:///./b2b_platform.db")
-AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-Base = declarative_base()
+DB_PATH = "leads.db"
 
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    is_verified = Column(Boolean, default=False)
-    otp_code = Column(String, nullable=True) # <-- ИМЕННО ИЗ-ЗА ЭТОЙ СТРОКИ ПАДАЛ СЕРВЕР
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            modules TEXT,
+            db_type TEXT,
+            pro_feature_vote TEXT,
+            sean_ellis_vote TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
-async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-async def get_db():
-    async with AsyncSessionLocal() as session:
-        yield session
+def save_lead(email: str, modules: list, db_type: str, pro_feature: str, sean_ellis: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    modules_str = json.dumps(modules)
+    
+    cursor.execute('''
+        INSERT INTO leads (email, modules, db_type, pro_feature_vote, sean_ellis_vote)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (email, modules_str, db_type, pro_feature, sean_ellis))
+    
+    conn.commit()
+    conn.close()
